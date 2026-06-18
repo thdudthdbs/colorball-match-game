@@ -739,7 +739,7 @@
     <button id="resultRetryBtn" type="button">다시하기</button>
   </div>
 </div>
-<button id="startBtn" type="button">시작</button></div></div></main><script>
+<button id="startBtn" type="button">시작</button></div></div></main><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script><script>
 const MODE="infinite";
 const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
 const mainValueText=document.getElementById("mainValueText"),statOneText=document.getElementById("statOneText"),statTwoText=document.getElementById("statTwoText"),statThreeText=document.getElementById("statThreeText"),statThreeCard=document.getElementById("statThreeCard"),overlay=document.getElementById("overlay"),overlayKicker=document.getElementById("overlayKicker"),overlayTitle=document.getElementById("overlayTitle"),overlayBody=document.getElementById("overlayBody"),startBtn=document.getElementById("startBtn"),restartBtn=document.getElementById("restartBtn"),stageHeaderText=document.getElementById("stageHeaderText"),rankingNameInput=document.getElementById("rankingNameInput"),rankingNameError=document.getElementById("rankingNameError"),rankSubmitBtn=document.getElementById("rankSubmitBtn"),resultRetryBtn=document.getElementById("resultRetryBtn");
@@ -806,8 +806,22 @@ function launch(power,vx=0){if(!drag||state!=="playing"||!cur)return;cur.vx=clam
 function board(rows,colors){balls=[];let cols=6,gx=48,gy=48,sx=(W-gx*(cols-1))/2;for(let r=0;r<rows;r++){let off=r%2?gx/2:0,cc=r%2?cols-1:cols;for(let c=0;c<cc;c++){if(Math.random()<.1&&r>1)continue;let col=colors[Math.floor(Math.random()*colors.length)];balls.push(mk(sx+off+c*gx,TOP+r*gy,col,true))}}if(MODE==="mission"&&balls.length%2===1)balls.pop()}
 function addRow(){let st=infStage();balls.forEach(b=>{b.y+=st.rowShift;b.vy+=.36+st.label*.05});let cols=6,gx=48,sx=(W-gx*(cols-1))/2,a=st.colors;for(let c=0;c<cols;c++)if(Math.random()>.14)balls.push(mk(sx+c*gx,TOP,a[Math.floor(Math.random()*a.length)],true))}
 
-const RANKING_KEY="colorMatchRankingTop10";
 const BROWSER_ID_KEY="colorMatchBrowserId";
+const RANKING_COLLECTION="rankings";
+const DEFAULT_RANKING_ERROR="동일한 이름은 설정할 수 없어요";
+const firebaseConfig = {
+  apiKey: "AIzaSyA4XLUbxqS5-99FnNz95CmY_drG46Jx2u8",
+  authDomain: "colorball-match-game.firebaseapp.com",
+  projectId: "colorball-match-game",
+  storageBucket: "colorball-match-game.firebasestorage.app",
+  messagingSenderId: "352876179466",
+  appId: "1:352876179466:web:09e6eb5e4a26a28f2beff3",
+  measurementId: "G-020ZFKH0X7"
+};
+let firebaseApp=null;
+let firebaseDb=null;
+let firebaseAuth=null;
+let firebaseReadyPromise=null;
 function getBrowserId(){
   let id=localStorage.getItem(BROWSER_ID_KEY);
   if(!id){
@@ -820,48 +834,89 @@ function normalizeRankName(name){
   const raw=(name||"").trim().replace(/\s+/g," ");
   return [...raw].slice(0,10).join("") || "익명";
 }
-function getRankings(){
-  try{
-    const data=JSON.parse(localStorage.getItem(RANKING_KEY)||"[]");
-    return Array.isArray(data)?data.filter(item=>item&&typeof item.score==="number").slice(0,10):[];
-  }catch(e){return []}
+function toRankNameKey(name){
+  return encodeURIComponent(name.normalize("NFC").toLocaleLowerCase("ko-KR"));
+}
+async function initFirebaseRanking(){
+  if(firebaseReadyPromise) return firebaseReadyPromise;
+  firebaseReadyPromise=(async()=>{
+    if(!window.firebase) throw new Error("Firebase SDK를 불러오지 못했어요.");
+    firebaseApp=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(firebaseConfig);
+    firebaseDb=firebase.firestore();
+    firebaseAuth=firebase.auth();
+    await firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    if(!firebaseAuth.currentUser){
+      await firebaseAuth.signInAnonymously();
+    }
+    return firebaseAuth.currentUser;
+  })().catch(err=>{
+    firebaseReadyPromise=null;
+    throw err;
+  });
+  return firebaseReadyPromise;
 }
 function clearRankingNameError(){
   const form=rankingNameInput&&rankingNameInput.closest(".result-form");
   if(form) form.classList.remove("has-error");
   if(rankingNameInput) rankingNameInput.classList.remove("is-invalid");
+  if(rankingNameError) rankingNameError.textContent=DEFAULT_RANKING_ERROR;
 }
-function showRankingNameError(){
+function showRankingNameError(message=DEFAULT_RANKING_ERROR){
   const form=rankingNameInput&&rankingNameInput.closest(".result-form");
   if(form) form.classList.add("has-error");
+  if(rankingNameError) rankingNameError.textContent=message;
   if(rankingNameInput){
     rankingNameInput.classList.add("is-invalid");
     rankingNameInput.focus();
   }
 }
-function findDuplicateName(name, list, browserId){
-  return list.find(item=>item.name===name && item.ownerId && item.ownerId!==browserId);
+async function fetchRankings(){
+  await initFirebaseRanking();
+  const snap=await firebaseDb.collection(RANKING_COLLECTION).orderBy("score","desc").limit(10).get();
+  return snap.docs
+    .map(doc=>{
+      const data=doc.data()||{};
+      return {name:data.name||"익명",score:Number(data.score)||0,ownerId:data.playerId||""};
+    })
+    .filter(item=>item.score>=0)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,10);
 }
-function saveRanking(name, value){
-  const browserId=getBrowserId();
+async function saveRanking(name,value){
   const clean=normalizeRankName(name);
-  const list=getRankings();
-  if(findDuplicateName(clean,list,browserId)){
-    showRankingNameError();
+  const nameKey=toRankNameKey(clean);
+  const numericScore=Math.max(0,Math.floor(Number(value)||0));
+  try{
+    const user=await initFirebaseRanking();
+    const docRef=firebaseDb.collection(RANKING_COLLECTION).doc(nameKey);
+    await firebaseDb.runTransaction(async tx=>{
+      const snap=await tx.get(docRef);
+      const now=firebase.firestore.FieldValue.serverTimestamp();
+      if(snap.exists){
+        const data=snap.data()||{};
+        if(data.playerId&&data.playerId!==user.uid){
+          const err=new Error("duplicate-name");
+          err.code="duplicate-name";
+          throw err;
+        }
+        const best=Math.max(Number(data.score)||0,numericScore);
+        tx.update(docRef,{score:best,updatedAt:now});
+      }else{
+        tx.set(docRef,{name:clean,nameKey,score:numericScore,playerId:user.uid,createdAt:now,updatedAt:now});
+      }
+    });
+    localStorage.setItem("colorMatchLastName", clean);
+    clearRankingNameError();
+    return await fetchRankings();
+  }catch(err){
+    console.error(err);
+    if(err&&err.code==="duplicate-name"){
+      showRankingNameError(DEFAULT_RANKING_ERROR);
+      return null;
+    }
+    showRankingNameError("랭킹 연결에 실패했어요. 잠시 후 다시 시도해주세요.");
     return null;
   }
-  clearRankingNameError();
-  localStorage.setItem("colorMatchLastName", clean);
-  const sameIndex=list.findIndex(item=>item.name===clean && (!item.ownerId || item.ownerId===browserId));
-  if(sameIndex>=0){
-    list[sameIndex]={...list[sameIndex],name:clean,score:Math.max(list[sameIndex].score,value),ownerId:browserId,date:Date.now()};
-  }else{
-    list.push({name:clean,score:value,ownerId:browserId,date:Date.now()});
-  }
-  list.sort((a,b)=>b.score-a.score || a.date-b.date);
-  const top=list.slice(0,10);
-  localStorage.setItem(RANKING_KEY, JSON.stringify(top));
-  return top;
 }
 function rankBadge(index){
   if(index===0) return '<span class="rank-badge rank-medal gold" data-rank="1"></span>';
@@ -873,9 +928,18 @@ function renderRankingRows(list){
   if(!list.length) return '<div class="ranking-empty">아직 등록된 기록이 없어요.</div>';
   return '<ol class="ranking-list">'+list.map((item,index)=>`<li>${rankBadge(index)}<div class="rank-meta"><span class="rank-name">${item.name}</span></div><div class="rank-score-wrap"><strong class="rank-score">${item.score.toLocaleString()}<small>점</small></strong></div></li>`).join("")+'</ol>';
 }
-function showRankingBoard(list=getRankings()){
+async function showRankingBoard(list=null){
   state="ranking";
-  show("","랭킹 TOP 10",renderRankingRows(list),"다시하기","ranking");
+  show("","랭킹 TOP 10",list?renderRankingRows(list):'<div class="ranking-empty">랭킹을 불러오는 중이에요.</div>',"다시하기","ranking");
+  if(!list){
+    try{
+      const remoteList=await fetchRankings();
+      overlayBody.innerHTML=renderRankingRows(remoteList);
+    }catch(err){
+      console.error(err);
+      overlayBody.innerHTML='<div class="ranking-empty">랭킹을 불러오지 못했어요.</div>';
+    }
+  }
 }
 
 function checkScoreStageClear(){
@@ -959,8 +1023,13 @@ startBtn.addEventListener("click",()=>{
   }
 });
 if(rankSubmitBtn){
-  rankSubmitBtn.addEventListener("click",()=>{
-    const list=saveRanking(rankingNameInput?rankingNameInput.value:"", score);
+  rankSubmitBtn.addEventListener("click",async()=>{
+    const previousText=rankSubmitBtn.textContent;
+    rankSubmitBtn.disabled=true;
+    rankSubmitBtn.textContent="등록 중...";
+    const list=await saveRanking(rankingNameInput?rankingNameInput.value:"", score);
+    rankSubmitBtn.disabled=false;
+    rankSubmitBtn.textContent=previousText;
     if(list) showRankingBoard(list);
   });
 }
