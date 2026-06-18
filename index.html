@@ -719,6 +719,39 @@
   transform-origin: 36px 48px !important;
 }
 
+
+/* V22 high score board */
+.high-score-form{
+  margin-top:18px;
+}
+.rank-main-score{
+  display:block;
+  color:#191f28;
+  font-size:19px;
+  font-weight:900;
+  line-height:1.2;
+  letter-spacing:-.04em;
+  white-space:nowrap;
+}
+.rank-main-score small{
+  margin-left:2px;
+  color:#6b7684;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:-.02em;
+}
+.rank-date-time{
+  display:block;
+  color:#8b95a1;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.25;
+  white-space:nowrap;
+}
+.overlay.ranking .ranking-list li{
+  grid-template-columns:52px minmax(0,1fr) minmax(92px,auto);
+}
+
 </style></head><body><main class="app"><header class="top"><div><p id="stageHeaderText" class="stage-header-text">stage 1</p><h1>같은 색 공 맞추기</h1></div><button id="restartBtn" class="ghost" type="button">처음부터</button></header><section class="score-hero"><span>점수</span><strong id="mainValueText">0</strong></section><section class="status"><div class="status-card"><span>사용 색상</span><strong id="statOneText">0</strong></div><div class="status-card"><span>콤보</span><strong id="statTwoText">0</strong></div><div id="statThreeCard" class="status-card"><span>목표 점수</span><strong id="statThreeText">0</strong></div></section><section class="game-card"><canvas id="game" width="390" height="620"></canvas></section><div id="overlay" class="overlay"><div class="overlay-card"><p id="overlayKicker"></p><h2 id="overlayTitle">같은 색 공<br>맞추기 게임</h2>
 <div class="onboarding-demo" id="onboardingDemo" aria-hidden="true">
   <div class="demo-playfield">
@@ -730,19 +763,16 @@
   </div>
 </div>
 <p id="overlayBody"></p>
-<div id="resultForm" class="result-form">
-  <label for="rankingNameInput">랭킹에 등록할 이름</label>
-  <input id="rankingNameInput" type="text" maxlength="10" placeholder="최대 10글자" autocomplete="off" />
-  <p id="rankingNameError" class="ranking-name-error">동일한 이름은 설정할 수 없어요</p>
+<div id="resultForm" class="result-form high-score-form">
   <div class="result-actions">
-    <button id="rankSubmitBtn" type="button">랭킹 등록하기</button>
+    <button id="rankSubmitBtn" type="button">내 기록 보기</button>
     <button id="resultRetryBtn" type="button">다시하기</button>
   </div>
 </div>
-<button id="startBtn" type="button">시작</button></div></div></main><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script><script>
+<button id="startBtn" type="button">시작</button></div></div></main><script>
 const MODE="infinite";
 const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
-const mainValueText=document.getElementById("mainValueText"),statOneText=document.getElementById("statOneText"),statTwoText=document.getElementById("statTwoText"),statThreeText=document.getElementById("statThreeText"),statThreeCard=document.getElementById("statThreeCard"),overlay=document.getElementById("overlay"),overlayKicker=document.getElementById("overlayKicker"),overlayTitle=document.getElementById("overlayTitle"),overlayBody=document.getElementById("overlayBody"),startBtn=document.getElementById("startBtn"),restartBtn=document.getElementById("restartBtn"),stageHeaderText=document.getElementById("stageHeaderText"),rankingNameInput=document.getElementById("rankingNameInput"),rankingNameError=document.getElementById("rankingNameError"),rankSubmitBtn=document.getElementById("rankSubmitBtn"),resultRetryBtn=document.getElementById("resultRetryBtn");
+const mainValueText=document.getElementById("mainValueText"),statOneText=document.getElementById("statOneText"),statTwoText=document.getElementById("statTwoText"),statThreeText=document.getElementById("statThreeText"),statThreeCard=document.getElementById("statThreeCard"),overlay=document.getElementById("overlay"),overlayKicker=document.getElementById("overlayKicker"),overlayTitle=document.getElementById("overlayTitle"),overlayBody=document.getElementById("overlayBody"),startBtn=document.getElementById("startBtn"),restartBtn=document.getElementById("restartBtn"),stageHeaderText=document.getElementById("stageHeaderText"),rankSubmitBtn=document.getElementById("rankSubmitBtn"),resultRetryBtn=document.getElementById("resultRetryBtn");
 const W=390,H=620,R=22,LX=W/2,LY=542,TOP=52,BOT=508,LEFT=42,RIGHT=W-42,MAXS=15.2;
 const C=[["#ff5d5d","#e23f3f","#ff9b9b"],["#4dabf7","#2f86d0","#a5d8ff"],["#ffd43b","#e2ae19","#fff08c"],["#51d88a","#31b66a","#a5f1c3"],["#9775fa","#7453d5","#d0bfff"],["#f783c5","#d95fa6","#ffc2df"],["#ff922b","#e67700","#ffd8a8"]];
 const STAGES=[{colors:[0,1,2],rows:2,shots:16},{colors:[0,1,2,3],rows:3,shots:14},{colors:[0,1,2,3],rows:3,shots:12},{colors:[0,1,2,3,4],rows:4,shots:10},{colors:[0,1,2,3,4,5],rows:4,shots:8}];
@@ -759,7 +789,7 @@ let score=0,shots=0,combo=0,diff=1,drop=0,stage=0,shotsLeft=0,totalStars=0,total
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}function d(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function pt(e){const r=canvas.getBoundingClientRect(),t=e.touches&&e.touches.length?e.touches[0]:e.changedTouches&&e.changedTouches.length?e.changedTouches[0]:e;return{x:(t.clientX-r.left)/r.width*W,y:(t.clientY-r.top)/r.height*H}}
 function hp(q){const t=performance.now();hist.push({x:q.x,y:q.y,t});hist=hist.filter(h=>t-h.t<140)}function hv(){if(hist.length<2)return{vx:0,vy:0};const l=hist[hist.length-1];let f=hist[0];for(let i=hist.length-2;i>=0;i--)if(l.t-hist[i].t>=45){f=hist[i];break}const dt=Math.max(1,l.t-f.t);return{vx:(l.x-f.x)/dt,vy:(l.y-f.y)/dt}}
-function show(k,t,b,btn="시작",m="default"){mode=m;overlayKicker.textContent=k;overlayTitle.innerHTML=t;overlayBody.innerHTML=b;startBtn.textContent=btn;overlay.classList.toggle("title",m==="title");overlay.classList.toggle("onboarding",m==="onboarding");overlay.classList.toggle("result",m==="result");overlay.classList.toggle("stage-clear",m==="stageClear");overlay.classList.toggle("ranking",m==="ranking");if(m==="result"&&rankingNameInput){rankingNameInput.value=localStorage.getItem("colorMatchLastName")||"";clearRankingNameError()}overlay.classList.remove("hidden")}function hide(){overlay.classList.add("hidden");overlay.classList.remove("title","onboarding","result","stage-clear","ranking")}
+function show(k,t,b,btn="시작",m="default"){mode=m;overlayKicker.textContent=k;overlayTitle.innerHTML=t;overlayBody.innerHTML=b;startBtn.textContent=btn;overlay.classList.toggle("title",m==="title");overlay.classList.toggle("onboarding",m==="onboarding");overlay.classList.toggle("result",m==="result");overlay.classList.toggle("stage-clear",m==="stageClear");overlay.classList.toggle("ranking",m==="ranking");overlay.classList.remove("hidden")}function hide(){overlay.classList.add("hidden");overlay.classList.remove("title","onboarding","result","stage-clear","ranking")}
 function rr(x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath()}
 function mk(x,y,c,f=true){return{id:nextId++,x,y,vx:0,vy:0,r:R,color:c,fixed:f,impact:0}}
 function drawBall(b){const c=C[b.color],r=b.r,impact=b.impact||0,squash=clamp(impact*.018,0,.075);ctx.save();ctx.translate(b.x,b.y);ctx.scale(1+squash,1-squash*.5);ctx.fillStyle="rgba(25,31,40,.1)";ctx.beginPath();ctx.ellipse(0,r*.82,r*.78,r*.28,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=c[0];ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.fillStyle=c[1];ctx.globalAlpha=.38;ctx.beginPath();ctx.ellipse(0,r*.25,r*.9,r*.62,0,0,Math.PI);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=c[2];ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(-r*.32,-r*.34,r*.27,0,Math.PI*2);ctx.fill();ctx.restore()}
@@ -806,117 +836,49 @@ function launch(power,vx=0){if(!drag||state!=="playing"||!cur)return;cur.vx=clam
 function board(rows,colors){balls=[];let cols=6,gx=48,gy=48,sx=(W-gx*(cols-1))/2;for(let r=0;r<rows;r++){let off=r%2?gx/2:0,cc=r%2?cols-1:cols;for(let c=0;c<cc;c++){if(Math.random()<.1&&r>1)continue;let col=colors[Math.floor(Math.random()*colors.length)];balls.push(mk(sx+off+c*gx,TOP+r*gy,col,true))}}if(MODE==="mission"&&balls.length%2===1)balls.pop()}
 function addRow(){let st=infStage();balls.forEach(b=>{b.y+=st.rowShift;b.vy+=.36+st.label*.05});let cols=6,gx=48,sx=(W-gx*(cols-1))/2,a=st.colors;for(let c=0;c<cols;c++)if(Math.random()>.14)balls.push(mk(sx+c*gx,TOP,a[Math.floor(Math.random()*a.length)],true))}
 
-const BROWSER_ID_KEY="colorMatchBrowserId";
-const RANKING_COLLECTION="rankings";
-const DEFAULT_RANKING_ERROR="동일한 이름은 설정할 수 없어요";
-const firebaseConfig = {
-  apiKey: "AIzaSyA4XLUbxqS5-99FnNz95CmY_drG46Jx2u8",
-  authDomain: "colorball-match-game.firebaseapp.com",
-  projectId: "colorball-match-game",
-  storageBucket: "colorball-match-game.firebasestorage.app",
-  messagingSenderId: "352876179466",
-  appId: "1:352876179466:web:09e6eb5e4a26a28f2beff3",
-  measurementId: "G-020ZFKH0X7"
-};
-let firebaseApp=null;
-let firebaseDb=null;
-let firebaseAuth=null;
-let firebaseReadyPromise=null;
-function getBrowserId(){
-  let id=localStorage.getItem(BROWSER_ID_KEY);
-  if(!id){
-    id=`browser-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-    localStorage.setItem(BROWSER_ID_KEY,id);
-  }
-  return id;
+const HIGH_SCORE_STORAGE_KEY="colorMatchHighScoreTop10LocalV2";
+const HIGH_SCORE_VERSION="local-high-score-top10-v3";
+console.info(`[color-match] ${HIGH_SCORE_VERSION}`);
+function normalizeHighScoreItem(item){
+  return {
+    score:Math.max(0,Math.floor(Number(item&&item.score)||0)),
+    time:Number(item&&item.time)||Date.now()
+  };
 }
-function normalizeRankName(name){
-  const raw=(name||"").trim().replace(/\s+/g," ");
-  return [...raw].slice(0,10).join("") || "익명";
-}
-function toRankNameKey(name){
-  return encodeURIComponent(name.normalize("NFC").toLocaleLowerCase("ko-KR"));
-}
-async function initFirebaseRanking(){
-  if(firebaseReadyPromise) return firebaseReadyPromise;
-  firebaseReadyPromise=(async()=>{
-    if(!window.firebase) throw new Error("Firebase SDK를 불러오지 못했어요.");
-    firebaseApp=firebase.apps&&firebase.apps.length?firebase.app():firebase.initializeApp(firebaseConfig);
-    firebaseDb=firebase.firestore();
-    firebaseAuth=firebase.auth();
-    await firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    if(!firebaseAuth.currentUser){
-      await firebaseAuth.signInAnonymously();
-    }
-    return firebaseAuth.currentUser;
-  })().catch(err=>{
-    firebaseReadyPromise=null;
-    throw err;
-  });
-  return firebaseReadyPromise;
-}
-function clearRankingNameError(){
-  const form=rankingNameInput&&rankingNameInput.closest(".result-form");
-  if(form) form.classList.remove("has-error");
-  if(rankingNameInput) rankingNameInput.classList.remove("is-invalid");
-  if(rankingNameError) rankingNameError.textContent=DEFAULT_RANKING_ERROR;
-}
-function showRankingNameError(message=DEFAULT_RANKING_ERROR){
-  const form=rankingNameInput&&rankingNameInput.closest(".result-form");
-  if(form) form.classList.add("has-error");
-  if(rankingNameError) rankingNameError.textContent=message;
-  if(rankingNameInput){
-    rankingNameInput.classList.add("is-invalid");
-    rankingNameInput.focus();
-  }
-}
-async function fetchRankings(){
-  await initFirebaseRanking();
-  const snap=await firebaseDb.collection(RANKING_COLLECTION).orderBy("score","desc").limit(10).get();
-  return snap.docs
-    .map(doc=>{
-      const data=doc.data()||{};
-      return {name:data.name||"익명",score:Number(data.score)||0,ownerId:data.playerId||""};
-    })
-    .filter(item=>item.score>=0)
-    .sort((a,b)=>b.score-a.score)
-    .slice(0,10);
-}
-async function saveRanking(name,value){
-  const clean=normalizeRankName(name);
-  const nameKey=toRankNameKey(clean);
-  const numericScore=Math.max(0,Math.floor(Number(value)||0));
+function getHighScores(){
   try{
-    const user=await initFirebaseRanking();
-    const docRef=firebaseDb.collection(RANKING_COLLECTION).doc(nameKey);
-    await firebaseDb.runTransaction(async tx=>{
-      const snap=await tx.get(docRef);
-      const now=firebase.firestore.FieldValue.serverTimestamp();
-      if(snap.exists){
-        const data=snap.data()||{};
-        if(data.playerId&&data.playerId!==user.uid){
-          const err=new Error("duplicate-name");
-          err.code="duplicate-name";
-          throw err;
-        }
-        const best=Math.max(Number(data.score)||0,numericScore);
-        tx.update(docRef,{score:best,updatedAt:now});
-      }else{
-        tx.set(docRef,{name:clean,nameKey,score:numericScore,playerId:user.uid,createdAt:now,updatedAt:now});
-      }
-    });
-    localStorage.setItem("colorMatchLastName", clean);
-    clearRankingNameError();
-    return await fetchRankings();
+    const parsed=JSON.parse(localStorage.getItem(HIGH_SCORE_STORAGE_KEY)||"[]");
+    if(!Array.isArray(parsed)) return [];
+    return parsed
+      .map(normalizeHighScoreItem)
+      .filter(item=>Number.isFinite(item.score)&&Number.isFinite(item.time))
+      .sort((a,b)=>b.score-a.score || b.time-a.time)
+      .slice(0,10);
   }catch(err){
     console.error(err);
-    if(err&&err.code==="duplicate-name"){
-      showRankingNameError(DEFAULT_RANKING_ERROR);
-      return null;
-    }
-    showRankingNameError("랭킹 연결에 실패했어요. 잠시 후 다시 시도해주세요.");
-    return null;
+    return [];
   }
+}
+function setHighScores(list){
+  try{
+    localStorage.setItem(HIGH_SCORE_STORAGE_KEY,JSON.stringify(list.slice(0,10)));
+  }catch(err){
+    console.error(err);
+  }
+}
+function recordHighScore(value){
+  const numericScore=Math.max(0,Math.floor(Number(value)||0));
+  const list=getHighScores();
+  list.push({score:numericScore,time:Date.now()});
+  list.sort((a,b)=>b.score-a.score || b.time-a.time);
+  const top10=list.slice(0,10);
+  setHighScores(top10);
+  return top10;
+}
+function formatScoreDateTime(value){
+  const d=new Date(Number(value)||Date.now());
+  const pad=n=>String(n).padStart(2,"0");
+  return `${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function rankBadge(index){
   if(index===0) return '<span class="rank-badge rank-medal gold" data-rank="1"></span>';
@@ -926,20 +888,12 @@ function rankBadge(index){
 }
 function renderRankingRows(list){
   if(!list.length) return '<div class="ranking-empty">아직 등록된 기록이 없어요.</div>';
-  return '<ol class="ranking-list">'+list.map((item,index)=>`<li>${rankBadge(index)}<div class="rank-meta"><span class="rank-name">${item.name}</span></div><div class="rank-score-wrap"><strong class="rank-score">${item.score.toLocaleString()}<small>점</small></strong></div></li>`).join("")+'</ol>';
+  return '<ol class="ranking-list">'+list.map((item,index)=>`<li>${rankBadge(index)}<div class="rank-meta"><span class="rank-main-score">${item.score.toLocaleString()}<small>점</small></span></div><div class="rank-score-wrap"><span class="rank-date-time">${formatScoreDateTime(item.time)}</span></div></li>`).join("")+'</ol>';
 }
-async function showRankingBoard(list=null){
+function showRankingBoard(list=null){
   state="ranking";
-  show("","랭킹 TOP 10",list?renderRankingRows(list):'<div class="ranking-empty">랭킹을 불러오는 중이에요.</div>',"다시하기","ranking");
-  if(!list){
-    try{
-      const remoteList=await fetchRankings();
-      overlayBody.innerHTML=renderRankingRows(remoteList);
-    }catch(err){
-      console.error(err);
-      overlayBody.innerHTML='<div class="ranking-empty">랭킹을 불러오지 못했어요.</div>';
-    }
-  }
+  const localList=list||getHighScores();
+  show("","최고기록 TOP 10",renderRankingRows(localList),"다시하기","ranking");
 }
 
 function checkScoreStageClear(){
@@ -982,6 +936,7 @@ function onShot(){state="flying";if(MODE==="infinite"){shots++;drop++;updateUi()
 function stars(){let ratio=shotsLeft/initialShots;return ratio>=.42?3:ratio>=.18?2:1}
 function updateSettling(){if(state!=="settling")return;if(recent())return;let max=balls.reduce((m,b)=>Math.max(m,Math.hypot(b.vx,b.vy)),0);settle=max<.065?settle+1:0;if(settle<14)return;if(MODE==="infinite"){if(balls.some(b=>b.y>462)){
   state = "over";
+  recordHighScore(score);
   show("GAME OVER", `${score}<small>점</small>`, "", "다시 하기", "result");
   return;
 }
@@ -989,14 +944,38 @@ let st=infStage(),every=st.dropEvery;
 if(drop>=every){drop=0;diff++;addRow()}
 combo=0;lastShot=null;lastAttach=null;makeCur();state="playing";settle=0;updateUi()}else{if(balls.length===0){let s=stars();totalStars+=s;state="clear";show(`STAGE ${stage+1}`,`${stage+1}스테이지 클리어`,`획득 별 ${"★".repeat(s)}<br>남은 샷 ${shotsLeft}개`,stage===STAGES.length-1?"결과 보기":"다음");updateUi();return}if(shotsLeft<=0||balls.some(b=>b.y>462)){state="fail";show("FAILED",`${stage+1}스테이지 실패`,"제한 샷 안에 모든 공을 제거하지 못했어요.<br>현재 스테이지부터 다시 시작합니다.","다시 도전");return}lastShot=null;lastAttach=null;makeCur();state="playing";settle=0;updateUi()}}
 function draw(){bg();balls.forEach(drawBall);if(cur)drawBall(cur);guide();drawFx()}
-function tick(){if(state==="flying")fly();if(["playing","flying","settling"].includes(state))settleBalls();updateSettling();updateUi();draw();requestAnimationFrame(tick)}
-function startInfinite(){score=0;shots=0;combo=0;diff=1;drop=0;infStageIndex=0;pops=[];texts=[];lastShot=null;lastAttach=null;let s=infStage();board(s.rows,s.colors);makeCur();state="playing";hide();updateUi()}
+const FIXED_STEP_MS=1000/60;
+let lastFrameTime=performance.now();
+let frameAccumulator=0;
+function resetGameClock(){lastFrameTime=performance.now();frameAccumulator=0}
+function stepPhysics(){
+  if(state==="flying")fly();
+  if(["playing","flying","settling"].includes(state))settleBalls();
+  updateSettling();
+}
+function tick(now=performance.now()){
+  const delta=Math.min(100,Math.max(0,now-lastFrameTime));
+  lastFrameTime=now;
+  frameAccumulator+=delta;
+  let steps=0;
+  while(frameAccumulator>=FIXED_STEP_MS&&steps<5){
+    stepPhysics();
+    frameAccumulator-=FIXED_STEP_MS;
+    steps++;
+  }
+  if(steps>=5) frameAccumulator=0;
+  updateUi();
+  draw();
+  requestAnimationFrame(tick);
+}
+function startInfinite(){resetGameClock();score=0;shots=0;combo=0;diff=1;drop=0;infStageIndex=0;pops=[];texts=[];lastShot=null;lastAttach=null;let s=infStage();board(s.rows,s.colors);makeCur();state="playing";hide();updateUi()}
 function startStage(retry=false){if(retry){totalStars=starsStart;totalUsed=usedStart}else{starsStart=totalStars;usedStart=totalUsed}let cfg=STAGES[stage];shotsLeft=cfg.shots;initialShots=cfg.shots;danger=false;statThreeCard.classList.remove("danger","blink");pops=[];texts=[];lastShot=null;lastAttach=null;board(cfg.rows,cfg.colors);makeCur();state="playing";hide();updateUi()}
 function showHowTo(){
   state="howto";
   show("HOW TO","게임 방법","같은 색 공을 맞춰 점수를 올리세요.","시작","onboarding");
 }
 function startNextInfStage(){
+  resetGameClock();
   infStageIndex += 1;
   combo = 0;
   drop = 0;
@@ -1012,7 +991,7 @@ function startNextInfStage(){
   hide();
   updateUi();
 }
-function title(){infStageIndex=0;state="ready";if(stageHeaderText) stageHeaderText.textContent="stage 1";show("","같은 색 공<br>맞추기 게임","","게임 방법 보기","title");updateUi()}
+function title(){resetGameClock();infStageIndex=0;state="ready";if(stageHeaderText) stageHeaderText.textContent="stage 1";show("","같은 색 공<br>맞추기 게임","","게임 방법 보기","title");updateUi()}
 startBtn.addEventListener("click",()=>{
   if(MODE==="infinite"){
     if(mode==="title"){showHowTo();return}
@@ -1023,18 +1002,9 @@ startBtn.addEventListener("click",()=>{
   }
 });
 if(rankSubmitBtn){
-  rankSubmitBtn.addEventListener("click",async()=>{
-    const previousText=rankSubmitBtn.textContent;
-    rankSubmitBtn.disabled=true;
-    rankSubmitBtn.textContent="등록 중...";
-    const list=await saveRanking(rankingNameInput?rankingNameInput.value:"", score);
-    rankSubmitBtn.disabled=false;
-    rankSubmitBtn.textContent=previousText;
-    if(list) showRankingBoard(list);
+  rankSubmitBtn.addEventListener("click",()=>{
+    showRankingBoard();
   });
-}
-if(rankingNameInput){
-  rankingNameInput.addEventListener("input",clearRankingNameError);
 }
 if(resultRetryBtn){
   resultRetryBtn.addEventListener("click",startInfinite);
